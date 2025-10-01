@@ -1,23 +1,17 @@
+import os
 import streamlit as st
 import pandas as pd
 
 st.title("📊 Painel de Rentabilidade - Consultor Belfort")
 
-# Lê a planilha
-try:
-    base_belfort = pd.read_excel("BASE DE CLIENTES CONSULTOR BELFORT.xlsx")
-except Exception as e:
-    st.error(f"Erro ao carregar a base: {e}")
-    st.stop()
+# Lista todos os arquivos disponíveis
+st.write("📂 Arquivos encontrados no repositório:", os.listdir("."))
 
-# Exibe todas as colunas detectadas
-st.subheader("Colunas encontradas no Excel")
-st.write(base_belfort.columns.tolist())
-
-# Verificação da coluna 'Acrônimo'
-if "Acrônimo" in base_belfort.columns:
-    clientes_belfort = base_belfort["Acrônimo"].dropna().unique().tolist()
-    cliente = st.selectbox("Selecione o cliente:", clientes_belfort)
-    st.success(f"Cliente selecionado: {cliente}")
+# Carrega o Excel se existir
+file_name = "BASE DE CLIENTES CONSULTOR BELFORT.xlsx"
+if file_name in os.listdir("."):
+    base_belfort = pd.read_excel(file_name)
+    st.success("Arquivo carregado com sucesso!")
+    st.write("Colunas disponíveis:", base_belfort.columns.tolist())
 else:
-    st.error("⚠️ A base não contém a coluna 'Acrônimo'. Confira acima os nomes disponíveis.")
+    st.error(f"⚠️ Arquivo '{file_name}' não encontrado no repositório.")
