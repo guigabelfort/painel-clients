@@ -1,64 +1,72 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import random
+from datetime import datetime
 
-# -------------------------------
-# Geração de base fictícia de clientes
-# -------------------------------
+# =============================
+# 1) Carregar base de clientes
+# =============================
 
-np.random.seed(42)
-clientes = [f"Cliente {i+1}" for i in range(80)]
-patrimonios = np.random.randint(200000, 5000000, size=80)
-rentabilidades = np.round(np.random.normal(6, 5, 80), 2)  # média 6%, desvio 5%
-perfis = np.random.choice(["Conservador", "Moderado", "Arrojado"], size=80, p=[0.3, 0.5, 0.2])
-instituicoes = np.random.choice(["XP", "BTG", "Avenue", "Itaú", "Nenhuma"], size=80, p=[0.25, 0.25, 0.2, 0.15, 0.15])
+base_belfort = pd.read_excel("BASE DE CLIENTES  CONSULTOR BELFORT.xlsx")
 
-df = pd.DataFrame({
-    "Cliente": clientes,
-    "Patrimônio (R$)": patrimonios,
-    "Rentabilidade YTD (%)": rentabilidades,
-    "Perfil": perfis,
-    "Instituição Externa": instituicoes
-})
+if "Acrônimo" in base_belfort.columns:
+    clientes_belfort = base_belfort["Acrônimo"].dropna().unique().tolist()
+else:
+    st.error("A base de clientes não contém a coluna 'Acrônimo'.")
+    st.stop()
 
-# -------------------------------
-# Layout Streamlit
-# -------------------------------
+# =============================
+# 2) Função para puxar rentabilidade do Comdinheiro
+# =============================
 
-st.set_page_config(page_title="Painel de Clientes", layout="wide")
+def get_rentabilidade(acronimo):
+    url = f"https://www.comdinheiro.com.br/ExtratoCarteira022.php?&nome_portfolio={acronimo}&data_ini=data_ini_acomp&data_fim=ult_du_mmenos1&layout=3"
+    try:
+        tabelas = pd.read_html(url, decimal=",", thousands=".")
+        return tabelas  # retorna todas as tabelas
+    except Exception as e:
+        return None
 
-st.title("📊 Painel de Gestão de Clientes")
+# =============================
+# 3) Layout no Streamlit
+# =============================
 
-# KPIs principais
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Clientes sob gestão", len(df))
-col2.metric("PL Total", f"R$ {df['Patrimônio (R$)'].sum():,.0f}")
-col3.metric("Rentabilidade Média YTD", f"{df['Rentabilidade YTD (%)'].mean():.2f}%")
-col4.metric("Clientes com instituição externa", f"{(df['Instituição Externa'] != 'Nenhuma').sum()}")
+st.set_page_config(page_title="Painel Consultor Belfort", layout="wide")
+st.title("📊 Painel de Rentabilidade - Clientes Belfort")
 
-st.markdown("---")
+# Seleção de cliente
+cliente = st.selectbox("Selecione o cliente:", clientes_belfort)
 
-# Filtros
-col_f1, col_f2 = st.columns(2)
-perfil_filter = col_f1.multiselect("Filtrar por perfil de risco:", options=df["Perfil"].unique(), default=df["Perfil"].unique())
-inst_filter = col_f2.multiselect("Filtrar por instituição externa:", options=df["Instituição Externa"].unique(), default=df["Instituição Externa"].unique())
+if cliente:
+    tabelas = get_rentabilidade(cliente)
 
-df_filtered = df[(df["Perfil"].isin(perfil_filter)) & (df["Instituição Externa"].isin(inst_filter))]
+    if tabelas is not None:
+        # Descobrir qual tabela contém rentabilidade
+        df_rent = tabelas[0]  # pode ser [1] ou [2], ajustar conforme necessário
 
-# Tabela interativa
-st.subheader("📋 Lista de Clientes")
-st.dataframe(df_filtered, use_container_width=True)
+        # Procurar coluna do ano atual
+        ano_atual = str(datetime.today().year)
+        colunas_possiveis = [c for c in df_rent.columns if ano_atual in str(c) or "Ano" in str(c)]
+        
+        rentab_ytd = None
+        if colunas_possiveis:
+            try:
+                rentab_ytd = df_rent[colunas_possiveis[0]].iloc[0]
+            except:
+                pass
 
-# Drill-down cliente
-st.markdown("---")
-st.subheader("🔍 Detalhamento de Cliente")
+        # KPI principal
+        col1, col2 = st.columns(2)
+        if rentab_ytd is not None:
+            col1.metric(f"Rentabilidade {ano_atual}", f"{rentab_ytd}")
+        else:
+            col1.warning("Não foi possível identificar a rentabilidade anual acumulada.")
 
-cliente = st.selectbox("Selecione um cliente:", df_filtered["Cliente"])
-info = df[df["Cliente"] == cliente].iloc[0]
+        col2.metric("Cliente", cliente)
 
-st.write(f"### {info['Cliente']}")
-st.write(f"**Patrimônio:** R$ {info['Patrimônio (R$)']:,}")
-st.write(f"**Rentabilidade YTD:** {info['Rentabilidade YTD (%)']}%")
-st.write(f"**Instituição Externa:** {info['Instituição Externa']}")
-st.write(f"**Perfil de Risco:** {info['Perfil']}")
+        st.markdown("---")
+        st.subheader("📈 Detalhamento da Rentabilidade")
+        st.dataframe(df_rent, use_container_width=True)
+
+    else:
+        st.warning("❌ Não foi possível puxar dados de rentabilidade do Comdinheiro.")
+
