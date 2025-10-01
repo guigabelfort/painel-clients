@@ -6,39 +6,41 @@ st.set_page_config(page_title="Painel de Rentabilidade", layout="wide")
 
 st.title("📊 Painel de Rentabilidade - Consultor Belfort")
 
-# ===============================
-# 1. Checar arquivos disponíveis
-# ===============================
-st.subheader("Arquivos encontrados no repositório:")
-st.write(os.listdir("."))  # Mostra todos os arquivos que o Streamlit enxerga
+# Função para localizar arquivo pelo nome aproximado
+def localizar_arquivo(palavra_chave):
+    arquivos = os.listdir(".")
+    for f in arquivos:
+        if palavra_chave.lower() in f.lower():
+            return f
+    return None
 
-# Nome EXATO do arquivo (atenção: há dois espaços no nome original)
-file_name = "BASE DE CLIENTES  CONSULTOR  BELFORT.xlsx"
+# Localiza os arquivos necessários
+arquivo_belfort = localizar_arquivo("BELFORT")
+arquivo_cadastro = localizar_arquivo("CADASTRAL")
 
-# ===============================
-# 2. Carregar base de clientes Belfort
-# ===============================
+# Mostra os arquivos encontrados
+st.subheader("📂 Arquivos encontrados no repositório:")
+st.write(os.listdir("."))
+
 try:
-    base_belfort = pd.read_excel(file_name)
-    st.success(f"✅ Arquivo '{file_name}' carregado com sucesso!")
-
-    # Mostrar colunas disponíveis
-    st.subheader("Colunas detectadas na planilha:")
-    st.write(base_belfort.columns.tolist())
-
-    # ===============================
-    # 3. Verificar coluna de Acrônimo
-    # ===============================
-    if "Acrônimo" in base_belfort.columns:
-        clientes = base_belfort["Acrônimo"].dropna().unique().tolist()
-        cliente_sel = st.selectbox("Selecione um cliente:", clientes)
-        st.info(f"🔎 Cliente selecionado: **{cliente_sel}**")
-
-        # Aqui futuramente vamos puxar a rentabilidade real do cliente (via Comdinheiro/API)
-        st.metric(label="Rentabilidade YTD", value="⏳ Em construção")
-
+    if not arquivo_belfort:
+        st.error("❌ Arquivo da base do Belfort não encontrado no repositório.")
     else:
-        st.error("⚠️ A planilha não contém a coluna 'Acrônimo'. Verifique os nomes listados acima.")
+        base_belfort = pd.read_excel(arquivo_belfort)
+
+        if not arquivo_cadastro:
+            st.warning("⚠️ Base cadastral não encontrada, carregando apenas Belfort.")
+            base_cadastro = None
+        else:
+            base_cadastro = pd.read_excel(arquivo_cadastro)
+
+        # Exemplo de visualização simples
+        st.success(f"✅ Arquivo '{arquivo_belfort}' carregado com sucesso!")
+        st.dataframe(base_belfort.head())
+
+        if base_cadastro is not None:
+            st.success(f"✅ Arquivo '{arquivo_cadastro}' carregado com sucesso!")
+            st.dataframe(base_cadastro.head())
 
 except Exception as e:
-    st.error(f"Erro ao carregar a base: {e}")
+    st.error(f"Erro ao carregar os dados: {e}")
