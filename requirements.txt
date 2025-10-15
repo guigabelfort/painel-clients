@@ -1,4 +1,4 @@
-streamlit
 pandas
 openpyxl
-lxml
+unidecode
+python-dateutil
